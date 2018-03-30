@@ -1,0 +1,10 @@
+*.jpg
+
+*.suo
+/.vs/
+
+/AnimeImageSorter/bin/
+/AnimeImageSorter/obj/
+
+/AnimeImageSorter/pass.txt
+/AnimeImageSorter/user.txt
