@@ -45,8 +45,19 @@ First: Uses the first tag.
 
 Skip: Skips these files from sorting.
 
+### Reverse Image Search
+Enables Reverse Image Search, only if booru/hash search fails: 
 
-### Notes
+- You need to have saucenaoapikey.txt and imgurapikey.txt in the same folder, filled with your own matching keys.
+
+- Very slow, every used image is uploaded.
+
+Yes: Enables Reverse Image Search on fail.
+
+No: disables Reverse Image Search on fail.
+
+
+## Notes
 
 This software is open source and may be distributed, modified, and used, but not sold commercially.
 

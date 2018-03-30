@@ -36,6 +36,30 @@ namespace AnimeImageSorter
             return null;
         }
 
+        public static JToken GetHttpJSONJToken(string adress)
+        {
+            //first we get a Stream of the Json, for that we use a webrequest
+            Stream resStream = GetHttpStream(adress, null, null, DecompressionMethods.None);
+            //GetHttpStream may return null if we got no nice answer
+            if (resStream == null)
+                return null;
+
+            try
+            {
+                var rawJson = new StreamReader(resStream).ReadToEnd();
+                //turns our raw string into a key value lookup
+                var json = JToken.Parse(rawJson);
+
+                return json;
+            }
+            catch (FormatException e)
+            {
+                Console.WriteLine(e.StackTrace);
+            }
+
+            return null;
+        }
+
         //This method returns a stream on the response of a RESTful webrequest
         private static Stream GetHttpStream(string adress, string username, string password,
             DecompressionMethods decompressionMethod)

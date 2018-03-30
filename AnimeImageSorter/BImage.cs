@@ -19,10 +19,8 @@ namespace AnimeImageSorter
 
         public bool SFW = false;
 
-        public BImage(JArray jArray)
+        public BImage(JToken jToken)
         {
-            var jToken = jArray[0];
-
             charCount = (int)jToken["tag_count_character"];
             charactersString = ((string)jToken["tag_string_character"]);
             characters = charactersString.Split(' ').ToList();

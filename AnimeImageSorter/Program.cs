@@ -51,8 +51,21 @@ namespace AnimeImageSorter
 
         static MultipleOption CurrentMultipleOption = MultipleOption.Unknown;
 
+        enum ReverseImageSearch
+        {
+            Unknown = 0,
+            Yes = 1,
+            No = 2
+        }
+
+        static ReverseImageSearch CurrentReverseImageSearch = ReverseImageSearch.Unknown;
+
         //Regex used to find MD5 in filenames
         private static Regex md5Regex = new Regex("^[0-9a-f]{32}$");
+
+        //SauceNao and Imgur ApiKeys
+        private static string sauceNaoApiKey;
+        private static string imgurApiKey;
 
         static void Main(string[] args)
         {
@@ -116,6 +129,33 @@ namespace AnimeImageSorter
             if (key4 == "Q" || CurrentMultipleOption == MultipleOption.Unknown)
                 return;
 
+            // Get ReverseImageSearch Type
+            Console.WriteLine("\n\nReverse Image Search images not found through hashing (this is slow and needs extra steps, details in github): y(es) / n(o) / q(uit)");
+            string key5 = Console.ReadKey().KeyChar.ToString().ToUpper();
+
+            if (key5 == "Y")
+                CurrentReverseImageSearch = ReverseImageSearch.Yes;
+
+            if (key5 == "N")
+                CurrentReverseImageSearch = ReverseImageSearch.No;
+
+            if (key5 == "Q" || CurrentReverseImageSearch == ReverseImageSearch.Unknown)
+                return;
+
+            if (CurrentReverseImageSearch == ReverseImageSearch.Yes)
+            {
+                if (File.Exists("sauceNaoApiKey.txt") && File.Exists("imgurApiKey.txt"))
+                {
+                    sauceNaoApiKey = File.ReadAllText("sauceNaoApiKey.txt");
+                    imgurApiKey = File.ReadAllText("imgurApiKey.txt");
+                }
+                else
+                {
+                    Console.WriteLine("\n Either sauceNaoApiKey.txt or imgurApiKey.txt missing. To fix this problem look into github. Press any key to quit.");
+                    Console.ReadKey();
+                }
+            }
+
             // List all files in the current folder
             List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory(), "*.*", SearchOption.TopDirectoryOnly)
                 .Where(x => x.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) 
@@ -143,17 +183,36 @@ namespace AnimeImageSorter
                     string danbooruUri = "https://danbooru.donmai.us/posts.json" + "?limit=1" + "&tags=md5:" + md5;
                     var danbooruJson = HttpRequester.GetHttpJSONJArray(danbooruUri);
 
+                    //If booru search didn't find anything, try reverse search
+                    if (danbooruJson?.Count > 0 && CurrentReverseImageSearch == ReverseImageSearch.Yes)
+                    {
+                        Console.WriteLine("Uploading to imgur for check...");
+                        string image = Imgur.Upload(file, imgurApiKey);
+
+                        List<Result> results = new SauceNao(sauceNaoApiKey).Request(image);
+
+                        //Remove all low similarity results
+                        results.RemoveAll(x => (float)x.header.similarity < 90.0);
+
+                        //Get danbooru id, if any high similarity result still has one
+                        string danbooruId = results.First(x => x.data.danbooru_id != null).data.danbooru_id;
+
+                        //Get JSON Data on file
+                        danbooruUri = "https://danbooru.donmai.us/posts/" + danbooruId + ".json";
+                        danbooruJson = new JArray() { HttpRequester.GetHttpJSONJToken(danbooruUri) };
+                    }
+
                     //Work JSON Data
-                    if(danbooruJson != null && danbooruJson.Count > 0)
+                    if (danbooruJson?.Count > 0)
                     {
                         //Log
                         Console.WriteLine("Found file on Danbooru: " + filename);
 
                         //Create bImage object
-                        var bImage = new BImage(danbooruJson);
+                        var bImage = new BImage(danbooruJson[0]);
 
                         //CopyMove file
-                        if(bImage.charCount >= 1 && CurrentSortBy == Sortby.Character 
+                        if (bImage.charCount >= 1 && CurrentSortBy == Sortby.Character
                             || bImage.copyRightCount >= 1 && CurrentSortBy == Sortby.Series)
                         {
                             CopyMoveFile(file, filenameLong, bImage);
