@@ -173,6 +173,7 @@ namespace AnimeImageSorter
                 {
                     Console.WriteLine("\n Either sauceNaoApiKey.txt or imgurApiKey.txt missing. To fix this problem look into github. Press any key to quit.");
                     Console.ReadKey();
+                    return;
                 }
             }
 
@@ -207,7 +208,7 @@ namespace AnimeImageSorter
                     var danbooruJson = HttpRequester.GetHttpJSONJArray(danbooruUri);
 
                     //If booru search didn't find anything, try reverse search
-                    if (danbooruJson?.Count > 0 && CurrentReverseImageSearch == ReverseImageSearch.Yes)
+                    if ((danbooruJson == null || danbooruJson.Count == 0) && CurrentReverseImageSearch == ReverseImageSearch.Yes)
                     {
                         Console.WriteLine("Uploading to imgur so it can be used for Reverse Image Search");
                         string image = Imgur.Upload(file, imgurApiKey);
@@ -226,7 +227,7 @@ namespace AnimeImageSorter
                     }
 
                     //Work JSON Data
-                    if (danbooruJson?.Count > 0)
+                    if (danbooruJson != null && danbooruJson.Count > 0)
                     {
                         //Log
                         Console.WriteLine("Found file on Danbooru: " + filename);
@@ -248,7 +249,8 @@ namespace AnimeImageSorter
                 }
                 catch(Exception e)
                 {
-
+                    Console.WriteLine(e);
+                    Console.WriteLine(e.Message);
                 }
             }
 
