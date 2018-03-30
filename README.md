@@ -54,7 +54,7 @@ Enables Reverse Image Search, only if booru/hash search fails:
 
 Yes: Enables Reverse Image Search on fail.
 
-No: disables Reverse Image Search on fail.
+No: Disables Reverse Image Search on fail.
 
 
 ## Notes

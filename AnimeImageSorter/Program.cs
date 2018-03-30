@@ -67,12 +67,32 @@ namespace AnimeImageSorter
         private static string sauceNaoApiKey;
         private static string imgurApiKey;
 
+        //Base directory for all further operations
+        private static string baseDirectory;
+
         static void Main(string[] args)
         {
             //Should rpleace this with switches
             // Get Sort Type
-            Console.WriteLine("All operation will work on: " + Directory.GetCurrentDirectory() + " not on subdirectories.");
-            Console.WriteLine("Sort by: s(eries) / c(haracter) / q(uit)");
+            Console.WriteLine("Enter image directory (no trailing / ) or leave clear and just press enter to use current directory:");
+            string directory = Console.ReadLine();
+
+            if(directory != "" && !Directory.Exists(directory))
+            {
+                Console.WriteLine(directory + " is not a valid directory, press any key to quit.");
+                Console.ReadKey();
+                return;
+            }
+
+            if (directory != "")
+                baseDirectory = directory;
+            else
+                baseDirectory = Directory.GetCurrentDirectory();
+                
+
+            Console.WriteLine("\nAll operations will work on:\n" + baseDirectory + "\nnot on subdirectories.");
+            Console.WriteLine("\nPress the matching letter key to select options:");
+            Console.WriteLine("Sort by:\n s(eries) / c(haracter) / q(uit)");
             string key = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key == "S")
@@ -85,7 +105,7 @@ namespace AnimeImageSorter
                 return;
 
             // Get FileOperation Type
-            Console.WriteLine("\n\nFile operation: m(ove) / c(opy) / q(uit)");
+            Console.WriteLine("\n\nFile operation:\n m(ove) / c(opy) / q(uit)");
             string key2 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key2 == "M")
@@ -98,7 +118,7 @@ namespace AnimeImageSorter
                 return;
 
             // Get MD5Option Type
-            Console.WriteLine("\n\nHash calculation, hard is slower but may be more precise in very rare cases: h(ard) / s(oft) / q(uit)");
+            Console.WriteLine("\n\nHash calculation, hard is slower but may be more precise in very rare cases:\n h(ard) / s(oft) / q(uit)");
             string key3 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key3 == "H")
@@ -111,7 +131,7 @@ namespace AnimeImageSorter
                 return;
 
             // Get MultipleOption Type
-            Console.WriteLine("\n\nHow to handle multiple tags/characters/series in the same imagetags:\nc(opies, copy file in multiple folders) / m(ixed, mixed foldernames) / f(irst, first tag) / s(kip) / q(uit)");
+            Console.WriteLine("\n\nHow to handle multiple tags/characters/series in the same image:\n c(opies, copy file in multiple folders) / m(ixed, mixed foldernames) / f(irst, first tag) / s(kip) / q(uit)");
             string key4 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key4 == "C")
@@ -130,7 +150,7 @@ namespace AnimeImageSorter
                 return;
 
             // Get ReverseImageSearch Type
-            Console.WriteLine("\n\nReverse Image Search images not found through hashing (this is slow and needs extra steps, details in github): y(es) / n(o) / q(uit)");
+            Console.WriteLine("\n\nReverse Image Search images not found through hashing (this is slow and needs extra steps, details in github):\n y(es) / n(o) / q(uit)");
             string key5 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key5 == "Y")
@@ -157,10 +177,12 @@ namespace AnimeImageSorter
             }
 
             // List all files in the current folder
-            List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory(), "*.*", SearchOption.TopDirectoryOnly)
+            List<string> files = Directory.EnumerateFiles(baseDirectory, "*.*", SearchOption.TopDirectoryOnly)
                 .Where(x => x.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) 
                 || x.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
                 || x.EndsWith(".gif", StringComparison.OrdinalIgnoreCase)).ToList();
+
+            Console.WriteLine("\n Found " + files.Count + " images.");
 
             //Work all files in the folder
             foreach (var file in files)
@@ -170,14 +192,15 @@ namespace AnimeImageSorter
                 string filename = file.Substring(filestart, file.LastIndexOf('.') - filestart);
                 string filenameLong = file.Substring(filestart);
 
+                Console.WriteLine("\nWorking file: " + filename);
+
                 //Calculate the MD5 Hash for each file
                 string md5 = GetMD5(file, filename);
 
                 try
                 {
                     //Log
-                    Console.WriteLine(md5);
-                    Console.WriteLine("Trying Danbooru for file: " + filename);
+                    Console.WriteLine("Trying Danbooru for file: " + filename + " with hash: " + md5);
 
                     //Get JSON Data on file
                     string danbooruUri = "https://danbooru.donmai.us/posts.json" + "?limit=1" + "&tags=md5:" + md5;
@@ -186,7 +209,7 @@ namespace AnimeImageSorter
                     //If booru search didn't find anything, try reverse search
                     if (danbooruJson?.Count > 0 && CurrentReverseImageSearch == ReverseImageSearch.Yes)
                     {
-                        Console.WriteLine("Uploading to imgur for check...");
+                        Console.WriteLine("Uploading to imgur so it can be used for Reverse Image Search");
                         string image = Imgur.Upload(file, imgurApiKey);
 
                         List<Result> results = new SauceNao(sauceNaoApiKey).Request(image);
@@ -218,12 +241,19 @@ namespace AnimeImageSorter
                             CopyMoveFile(file, filenameLong, bImage);
                         }
                     }
+                    else
+                    {
+                        Console.WriteLine("File could not be identified.");
+                    }
                 }
                 catch(Exception e)
                 {
 
                 }
-            }                
+            }
+
+            Console.WriteLine("\nAll Operations finished. Press any key to exit.");
+            Console.ReadKey();
         }
 
         private static string GetMD5(string file, string filename)
@@ -308,21 +338,30 @@ namespace AnimeImageSorter
             //CopyMove File in targetfolder(s)
             foreach (var targetFolder in targetFolders)
             {
+                string targetFolderLong = baseDirectory + "/" + targetFolder;
+                string targetFileLong = targetFolderLong + "/" + fileNameLong;
                 if (!Directory.Exists(targetFolder))
-                    Directory.CreateDirectory(targetFolder);
+                    Directory.CreateDirectory(targetFolderLong);
 
                 switch (CurrentFileOperation)
                 {
                     case FileOperation.Copy:
-                        File.Copy(file, targetFolder + "/" + fileNameLong, true);
+                        File.Copy(file, targetFileLong, true);
+                        Console.WriteLine("Copying: " + file + " to " + targetFileLong);
                         break;
 
                     //Copy until last, then move
                     case FileOperation.Move:
-                        if(targetFolder == targetFolders.Last())
-                            File.Move(file, targetFolder + "/" + fileNameLong);
+                        if (targetFolder == targetFolders.Last())
+                        {
+                            File.Move(file, targetFileLong);
+                            Console.WriteLine("Moving: " + file + " to " + targetFileLong);
+                        }
                         else
-                            File.Copy(file, targetFolder + "/" + fileNameLong, true);
+                        {
+                            File.Copy(file, targetFileLong, true);
+                            Console.WriteLine("Moving: " + file + " to " + targetFileLong);
+                        }
                         break;
                 }
             }
