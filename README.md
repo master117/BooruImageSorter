@@ -10,6 +10,10 @@ This program sorts anime and similar images based on tags on booru boards and ot
 
 ## Options
 
+### Directory
+
+Enter a directory to be used (no slash at the end), or leave blank to use the current directory the exe is in.
+
 ### Sort by
 
 Series: Series/Copyright to which the image belongs.
