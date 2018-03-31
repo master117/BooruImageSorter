@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,7 +19,7 @@ namespace AnimeImageSorter
             this.ApiKey = apiKey;
         }
 
-        public List<Result> Request(string url)
+        public SauceNaoResult Request(string url)
         {
             WebClient webClient = new WebClient();
 
@@ -28,23 +29,20 @@ namespace AnimeImageSorter
             webClient.QueryString.Add("api_key", ApiKey);
             webClient.QueryString.Add("url", url);
 
-            List<Result> results = new List<Result>();
+            SauceNaoResult sauceNaoResult = null;
 
             try
             {
                 string response = webClient.DownloadString(ENDPOINT);
-                dynamic dynObj = JsonConvert.DeserializeObject(response);
-                foreach (var result in dynObj.results)
-                {
-                    results.Add(new Result(result.header, result.data));
-                }
+                JObject jObject =  JObject.Parse(response);
+                sauceNaoResult = new SauceNaoResult(jObject);
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
             }
 
-            return results;
+            return sauceNaoResult;
         }
     }
 }

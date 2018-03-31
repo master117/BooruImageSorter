@@ -12,7 +12,7 @@ namespace AnimeImageSorter
 {
     class Imgur
     {
-        public static string Upload(string path, string apiKey)
+        public static ImgurResult Upload(string path, string apiKey)
         {
             using (var w = new WebClient())
             {
@@ -23,9 +23,17 @@ namespace AnimeImageSorter
                 };
 
                 string response = System.Text.Encoding.UTF8.GetString(w.UploadValues("https://api.imgur.com/3/upload", values));
-                Console.WriteLine(response);
-                dynamic dynObj = JsonConvert.DeserializeObject(response);
-                return dynObj.data.link;
+
+                string url = ((dynamic)JsonConvert.DeserializeObject(response)).data.link;
+                int userRemaining = int.Parse(w.ResponseHeaders.Get("X-RateLimit-UserRemaining"));
+                int clientRemaining = int.Parse(w.ResponseHeaders.Get("X-RateLimit-ClientRemaining"));
+                int postRemaining = int.Parse(w.ResponseHeaders.Get("X-Post-Rate-Limit-Remaining"));
+                DateTimeOffset userReset = DateTimeOffset.FromUnixTimeSeconds(int.Parse(w.ResponseHeaders.Get("X-RateLimit-UserReset")));
+                int postReset = int.Parse(w.ResponseHeaders.Get("X-Post-Rate-Limit-Reset"));
+
+                var imgurResult = new ImgurResult(url, userRemaining, clientRemaining, postRemaining, userReset, postReset);
+
+                return imgurResult;
             }
         }
     }

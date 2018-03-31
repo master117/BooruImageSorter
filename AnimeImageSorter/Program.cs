@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AnimeImageSorter
@@ -19,7 +20,6 @@ namespace AnimeImageSorter
             Series = 1,
             Character = 2
         }
-
         static Sortby CurrentSortBy = Sortby.Unknown;
 
         enum FileOperation
@@ -28,7 +28,6 @@ namespace AnimeImageSorter
             Move = 1,
             Copy = 2
         }
-
         static FileOperation CurrentFileOperation = FileOperation.Unknown;
 
         enum MD5Option
@@ -37,7 +36,6 @@ namespace AnimeImageSorter
             Hard = 1,
             Soft = 2
         }
-
         static MD5Option CurrentMD5Option = MD5Option.Unknown;
 
         enum MultipleOption
@@ -48,7 +46,6 @@ namespace AnimeImageSorter
             First = 3,
             Skip = 4
         }
-
         static MultipleOption CurrentMultipleOption = MultipleOption.Unknown;
 
         enum ReverseImageSearch
@@ -57,22 +54,25 @@ namespace AnimeImageSorter
             Yes = 1,
             No = 2
         }
-
         static ReverseImageSearch CurrentReverseImageSearch = ReverseImageSearch.Unknown;
 
         //Regex used to find MD5 in filenames
         private static Regex md5Regex = new Regex("^[0-9a-f]{32}$");
 
-        //SauceNao and Imgur ApiKeys
+        //SauceNao and Imgur Stuff
         private static string sauceNaoApiKey;
         private static string imgurApiKey;
+        private static int remainingSauces = int.MaxValue;
+        private static int remainingSaucesLong = int.MaxValue;
+        private static ImgurResult lastImage;
 
         //Base directory for all further operations
         private static string baseDirectory;
 
         static void Main(string[] args)
         {
-            //Should rpleace this with switches
+            #region Options
+            //Should replace this with switches
             // Get Sort Type
             Console.WriteLine("Enter image directory (no trailing / ) or leave clear and just press enter to use current directory:");
             string directory = Console.ReadLine();
@@ -176,13 +176,13 @@ namespace AnimeImageSorter
                     return;
                 }
             }
+            #endregion
 
             // List all files in the current folder
             List<string> files = Directory.EnumerateFiles(baseDirectory, "*.*", SearchOption.TopDirectoryOnly)
                 .Where(x => x.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) 
                 || x.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
                 || x.EndsWith(".gif", StringComparison.OrdinalIgnoreCase)).ToList();
-
             Console.WriteLine("\n Found " + files.Count + " images.");
 
             //Work all files in the folder
@@ -192,9 +192,7 @@ namespace AnimeImageSorter
                 int filestart = file.LastIndexOf('\\') + 1;
                 string filename = file.Substring(filestart, file.LastIndexOf('.') - filestart);
                 string filenameLong = file.Substring(filestart);
-
                 Console.WriteLine("\nWorking file: " + filename);
-
                 //Calculate the MD5 Hash for each file
                 string md5 = GetMD5(file, filename);
 
@@ -203,27 +201,76 @@ namespace AnimeImageSorter
                     //Log
                     Console.WriteLine("Trying Danbooru for file: " + filename + " with hash: " + md5);
 
-                    //Get JSON Data on file
-                    string danbooruUri = "https://danbooru.donmai.us/posts.json" + "?limit=1" + "&tags=md5:" + md5;
+                    //Try get JSON Data off file, from hash
+                    string danbooruUri = "https://danbooru.donmai.us/posts.json?limit=1&tags=md5:" + md5;
                     var danbooruJson = HttpRequester.GetHttpJSONJArray(danbooruUri);
 
                     //If booru search didn't find anything, try reverse search
                     if ((danbooruJson == null || danbooruJson.Count == 0) && CurrentReverseImageSearch == ReverseImageSearch.Yes)
                     {
-                        Console.WriteLine("Uploading to imgur so it can be used for Reverse Image Search");
-                        string image = Imgur.Upload(file, imgurApiKey);
+                        #region rateLimits
+                        //Adhere to all ratelimits
+                        if(remainingSauces < 2)
+                        {
+                            Console.WriteLine("\nToo many Sauces, approaching SauceNao 20 requests per 30s limit. Waiting 30s.");
+                            Thread.Sleep(30000);
+                        }
 
-                        List<Result> results = new SauceNao(sauceNaoApiKey).Request(image);
+                        if (remainingSaucesLong < 2)
+                        {
+                            Console.WriteLine("\nToo many Sauces, approaching SauceNao 300 requests per 24hrs limit. Press any key to quit, monitor your usage at https://saucenao.com/user.php?page=search-usage and start again.");
+                            Console.ReadKey();
+                            return;
+                        }
+
+                        if(lastImage.userRate < 15)
+                        {
+                            Console.WriteLine("\nToo many Imgur uploads. Approaching user rate limit of x per hour. Waiting until user rate is reset at: " + lastImage.userReset.ToLocalTime());
+                            Thread.Sleep((int)Math.Ceiling((lastImage.userReset.ToLocalTime() - DateTime.Now).TotalMilliseconds));
+                        }
+
+                        if (lastImage.clientRate < 15)
+                        {
+                            Console.WriteLine("\nToo many Imgur uploads. Approaching client rate limit of 1,250 per day. Press any key to quit and try again in 24hrs.");
+                            Console.ReadKey();
+                            return;
+                        }
+
+                        if (lastImage.postRemaining < 15)
+                        {
+                            Console.WriteLine("\nToo many Imgur uploads. Approaching post rate limit of 1,250 per hour. Waiting until user rate is reset in: " + lastImage.postReset + " seconds.");
+                            Thread.Sleep(lastImage.postReset * 1000);
+                        }
+                        #endregion
+
+                        Console.WriteLine("Uploading to imgur so it can be used for Reverse Image Search...");
+                        ImgurResult image = Imgur.Upload(file, imgurApiKey);
+                        lastImage = image;
+                        Console.WriteLine("Uploaded: " + Math.Min(lastImage.clientRate, Math.Min(lastImage.userRate, lastImage.postRemaining)) + " upload credits remaining. Reverse Image Searching...");
+
+                        SauceNaoResult response = new SauceNao(sauceNaoApiKey).Request(image.url);
+                        var results = response.results;
+                        remainingSauces = (int)response.header["short_remaining"];
+                        remainingSaucesLong = (int)response.header["long_remaining"];
 
                         //Remove all low similarity results
-                        results.RemoveAll(x => (float)x.header.similarity < 90.0);
+                        foreach (var element in results.ToArray().Where(x => (float)x.Key["similarity"] < 90.0))
+                            results.Remove(element.Key);
 
                         //Get danbooru id, if any high similarity result still has one
-                        string danbooruId = results.First(x => x.data.danbooru_id != null).data.danbooru_id;
+                        if (results.Any(x => x.Value["danbooru_id"] != null))
+                        {
+                            Console.WriteLine("Result found.");
+                            string danbooruId = results.First(x => x.Value["danbooru_id"] != null).Value["danbooru_id"].ToString();
 
-                        //Get JSON Data on file
-                        danbooruUri = "https://danbooru.donmai.us/posts/" + danbooruId + ".json";
-                        danbooruJson = new JArray() { HttpRequester.GetHttpJSONJToken(danbooruUri) };
+                            //Get JSON Data on file
+                            danbooruUri = "https://danbooru.donmai.us/posts/" + danbooruId + ".json";
+                            danbooruJson = new JArray() { HttpRequester.GetHttpJSONJToken(danbooruUri) };
+                        }
+                        else
+                        {
+                            Console.WriteLine("No result found.");
+                        }
                     }
 
                     //Work JSON Data
