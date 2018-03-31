@@ -12,29 +12,41 @@ namespace AnimeImageSorter
 {
     class Imgur
     {
+        private static string ENDPOINT = "https://api.imgur.com/3/upload";
+
         public static ImgurResult Upload(string path, string apiKey)
         {
-            using (var w = new WebClient())
+            ImgurResult imgurResult = null;
+
+            using (var web = new WebClient())
             {
-                w.Headers.Add("Authorization: Client-ID " + apiKey);
+                web.Headers.Add("Authorization: Client-ID " + apiKey);
                 var values = new NameValueCollection
                 {
                     { "image", Convert.ToBase64String(File.ReadAllBytes(@path)) }
                 };
 
-                string response = System.Text.Encoding.UTF8.GetString(w.UploadValues("https://api.imgur.com/3/upload", values));
+                try
+                {
 
-                string url = ((dynamic)JsonConvert.DeserializeObject(response)).data.link;
-                int userRemaining = int.Parse(w.ResponseHeaders.Get("X-RateLimit-UserRemaining"));
-                int clientRemaining = int.Parse(w.ResponseHeaders.Get("X-RateLimit-ClientRemaining"));
-                int postRemaining = int.Parse(w.ResponseHeaders.Get("X-Post-Rate-Limit-Remaining"));
-                DateTimeOffset userReset = DateTimeOffset.FromUnixTimeSeconds(int.Parse(w.ResponseHeaders.Get("X-RateLimit-UserReset")));
-                int postReset = int.Parse(w.ResponseHeaders.Get("X-Post-Rate-Limit-Reset"));
+                    string response = System.Text.Encoding.UTF8.GetString(web.UploadValues(ENDPOINT, values));
 
-                var imgurResult = new ImgurResult(url, userRemaining, clientRemaining, postRemaining, userReset, postReset);
+                    string url = ((dynamic)JsonConvert.DeserializeObject(response)).data.link;
+                    int userRemaining = int.Parse(web.ResponseHeaders.Get("X-RateLimit-UserRemaining"));
+                    int clientRemaining = int.Parse(web.ResponseHeaders.Get("X-RateLimit-ClientRemaining"));
+                    int postRemaining = int.Parse(web.ResponseHeaders.Get("X-Post-Rate-Limit-Remaining"));
+                    DateTimeOffset userReset = DateTimeOffset.FromUnixTimeSeconds(int.Parse(web.ResponseHeaders.Get("X-RateLimit-UserReset")));
+                    int postReset = int.Parse(web.ResponseHeaders.Get("X-Post-Rate-Limit-Reset"));
 
-                return imgurResult;
+                    imgurResult = new ImgurResult(url, userRemaining, clientRemaining, postRemaining, userReset, postReset);
+                }
+                catch(Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }              
             }
+
+            return imgurResult;
         }
     }
 }

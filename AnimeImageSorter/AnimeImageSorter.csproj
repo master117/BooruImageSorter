@@ -46,7 +46,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BImage.cs" />
-    <Compile Include="HttpRequester.cs" />
+    <Compile Include="Booru.cs" />
+    <Compile Include="BooruResult.cs" />
     <Compile Include="Imgur.cs" />
     <Compile Include="ImgurResult.cs" />
     <Compile Include="Program.cs" />

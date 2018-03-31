@@ -13,6 +13,7 @@ namespace AnimeImageSorter
 {
     class Program
     {
+        #region Startup Options
         //Startup options
         enum Sortby
         {
@@ -55,6 +56,7 @@ namespace AnimeImageSorter
             No = 2
         }
         static ReverseImageSearch CurrentReverseImageSearch = ReverseImageSearch.Unknown;
+        #endregion
 
         //Regex used to find MD5 in filenames
         private static Regex md5Regex = new Regex("^[0-9a-f]{32}$");
@@ -118,7 +120,7 @@ namespace AnimeImageSorter
                 return;
 
             // Get MD5Option Type
-            Console.WriteLine("\n\nHash calculation, hard is slower but may be more precise in very rare cases:\n h(ard) / s(oft) / q(uit)");
+            Console.WriteLine("\n\nHash calculation:\nHard always uses filehashes, lower success rate and speed but no false positives.\nSoft first looks for hashes in filenames, faster and better success rate, but may have false positives:\n h(ard) / s(oft) / q(uit)");
             string key3 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key3 == "H")
@@ -202,15 +204,16 @@ namespace AnimeImageSorter
                     Console.WriteLine("Trying Danbooru for file: " + filename + " with hash: " + md5);
 
                     //Try get JSON Data off file, from hash
-                    string danbooruUri = "https://danbooru.donmai.us/posts.json?limit=1&tags=md5:" + md5;
-                    var danbooruJson = HttpRequester.GetHttpJSONJArray(danbooruUri);
+                    var danbooruResult = (new Booru()).GetFromMD5(md5);
 
                     //If booru search didn't find anything, try reverse search
-                    if ((danbooruJson == null || danbooruJson.Count == 0) && CurrentReverseImageSearch == ReverseImageSearch.Yes)
+                    if ((danbooruResult.jArray == null || danbooruResult.jArray.Count == 0) && CurrentReverseImageSearch == ReverseImageSearch.Yes)
                     {
+                        Console.WriteLine("Couldn't find Hash on Danbooru.");
+
                         #region rateLimits
                         //Adhere to all ratelimits
-                        if(remainingSauces < 2)
+                        if (remainingSauces < 2)
                         {
                             Console.WriteLine("\nToo many Sauces, approaching SauceNao 20 requests per 30s limit. Waiting 30s.");
                             Thread.Sleep(30000);
@@ -246,10 +249,11 @@ namespace AnimeImageSorter
                         }
                         #endregion
 
-                        Console.WriteLine("Uploading to imgur so it can be used for Reverse Image Search...");
+                        Console.WriteLine("Uploading to imgur for Reverse Image Search...");
                         ImgurResult image = Imgur.Upload(file, imgurApiKey);
                         lastImage = image;
-                        Console.WriteLine("Uploaded: " + Math.Min(lastImage.clientRate, Math.Min(lastImage.userRate, lastImage.postRemaining)) + " upload credits remaining. Reverse Image Searching...");
+                        Console.WriteLine("Uploaded: " + Math.Min(lastImage.clientRate, Math.Min(lastImage.userRate, lastImage.postRemaining)) 
+                            + " to imgur, imgur upload credits remaining.\n Reverse Image Searching...");
 
                         SauceNaoResult response = new SauceNao(sauceNaoApiKey).Request(image.url);
                         var results = response.results;
@@ -260,15 +264,14 @@ namespace AnimeImageSorter
                         foreach (var element in results.ToArray().Where(x => (float)x.Key["similarity"] < 90.0))
                             results.Remove(element.Key);
 
-                        //Get danbooru id, if any high similarity result still has one
+                        //Get danbooru id, if any high similarity result has one, then get danbooru post from it
                         if (results.Any(x => x.Value["danbooru_id"] != null))
                         {
                             Console.WriteLine("Result found.");
                             string danbooruId = results.First(x => x.Value["danbooru_id"] != null).Value["danbooru_id"].ToString();
 
                             //Get JSON Data on file
-                            danbooruUri = "https://danbooru.donmai.us/posts/" + danbooruId + ".json";
-                            danbooruJson = new JArray() { HttpRequester.GetHttpJSONJToken(danbooruUri) };
+                            danbooruResult = (new Booru()).GetFromID(danbooruId);
                         }
                         else
                         {
@@ -277,25 +280,18 @@ namespace AnimeImageSorter
                     }
 
                     //Work JSON Data
-                    if (danbooruJson != null && danbooruJson.Count > 0)
+                    if (danbooruResult.jArray != null && danbooruResult.jArray.Count > 0)
                     {
                         //Log
                         Console.WriteLine("Found file on Danbooru: " + filename);
-
                         //Create bImage object
-                        var bImage = new BImage(danbooruJson[0]);
-
+                        var bImage = new BImage(danbooruResult.jArray[0]);
                         //CopyMove file
-                        if (bImage.charCount >= 1 && CurrentSortBy == Sortby.Character
-                            || bImage.copyRightCount >= 1 && CurrentSortBy == Sortby.Series)
-                        {
+                        if ((bImage.charCount >= 1 && CurrentSortBy == Sortby.Character) || (bImage.copyRightCount >= 1 && CurrentSortBy == Sortby.Series))
                             CopyMoveFile(file, filenameLong, bImage);
-                        }
                     }
                     else
-                    {
                         Console.WriteLine("File could not be identified.");
-                    }
                 }
                 catch(Exception e)
                 {

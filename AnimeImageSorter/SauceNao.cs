@@ -21,25 +21,25 @@ namespace AnimeImageSorter
 
         public SauceNaoResult Request(string url)
         {
-            WebClient webClient = new WebClient();
-
-            webClient.QueryString.Add("db", "999");
-            webClient.QueryString.Add("output_type", "2");
-            webClient.QueryString.Add("numres", "16");
-            webClient.QueryString.Add("api_key", ApiKey);
-            webClient.QueryString.Add("url", url);
-
             SauceNaoResult sauceNaoResult = null;
+            using (var web = new WebClient())
+            {
+                web.QueryString.Add("db", "999");
+                web.QueryString.Add("output_type", "2");
+                web.QueryString.Add("numres", "16");
+                web.QueryString.Add("api_key", ApiKey);
+                web.QueryString.Add("url", url);          
 
-            try
-            {
-                string response = webClient.DownloadString(ENDPOINT);
-                JObject jObject =  JObject.Parse(response);
-                sauceNaoResult = new SauceNaoResult(jObject);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
+                try
+                {
+                    string response = web.DownloadString(ENDPOINT);
+                    JObject jObject = JObject.Parse(response);
+                    sauceNaoResult = new SauceNaoResult(jObject);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }
             }
 
             return sauceNaoResult;

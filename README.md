@@ -31,9 +31,9 @@ Copy: Copy Files.
 To save bandwidth this programm initially uses MD5 hashes for looking up images.
 Sankaku and other booru images are by default named after their MD5 hash when downloading.
 
-Hard: Calculate all hashes based on filecontent.
+Hard: Calculate all hashes based on filecontent, lower success rate and speed but no false positives.
 
-Soft: Use filenames as hashes, when they match the hash pattern. 
+Soft: Use filenames as hashes, when they match the hash pattern, faster and better success rate, but may have false positives. 
 
 This is faster as hashes don't need to be calculated, 
 but may be wrong if a file has a name that is a valid hash, but doesn't belong to this file, which is extremely rare.
