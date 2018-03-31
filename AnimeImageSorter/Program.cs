@@ -223,23 +223,26 @@ namespace AnimeImageSorter
                             return;
                         }
 
-                        if(lastImage.userRate < 15)
+                        if (lastImage != null)
                         {
-                            Console.WriteLine("\nToo many Imgur uploads. Approaching user rate limit of x per hour. Waiting until user rate is reset at: " + lastImage.userReset.ToLocalTime());
-                            Thread.Sleep((int)Math.Ceiling((lastImage.userReset.ToLocalTime() - DateTime.Now).TotalMilliseconds));
-                        }
+                            if (lastImage.userRate < 15)
+                            {
+                                Console.WriteLine("\nToo many Imgur uploads. Approaching user rate limit of x per hour. Waiting until user rate is reset at: " + lastImage.userReset.ToLocalTime());
+                                Thread.Sleep((int)Math.Ceiling((lastImage.userReset.ToLocalTime() - DateTime.Now).TotalMilliseconds));
+                            }
 
-                        if (lastImage.clientRate < 15)
-                        {
-                            Console.WriteLine("\nToo many Imgur uploads. Approaching client rate limit of 1,250 per day. Press any key to quit and try again in 24hrs.");
-                            Console.ReadKey();
-                            return;
-                        }
+                            if (lastImage.clientRate < 15)
+                            {
+                                Console.WriteLine("\nToo many Imgur uploads. Approaching client rate limit of 1,250 per day. Press any key to quit and try again in 24hrs.");
+                                Console.ReadKey();
+                                return;
+                            }
 
-                        if (lastImage.postRemaining < 15)
-                        {
-                            Console.WriteLine("\nToo many Imgur uploads. Approaching post rate limit of 1,250 per hour. Waiting until user rate is reset in: " + lastImage.postReset + " seconds.");
-                            Thread.Sleep(lastImage.postReset * 1000);
+                            if (lastImage.postRemaining < 15)
+                            {
+                                Console.WriteLine("\nToo many Imgur uploads. Approaching post rate limit of 1,250 per hour. Waiting until user rate is reset in: " + lastImage.postReset + " seconds.");
+                                Thread.Sleep(lastImage.postReset * 1000);
+                            }
                         }
                         #endregion
 
