@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -71,8 +72,15 @@ namespace AnimeImageSorter
         //Base directory for all further operations
         private static string baseDirectory;
 
+        //Log writer
+        private static StreamWriter log;
+
         static void Main(string[] args)
         {
+            FileStream fileStream = File.Create(DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss") + ".log");
+            log = new StreamWriter(fileStream);
+            log.WriteLine("Log Started");
+
             #region Options
             //Should replace this with switches
             // Get Sort Type
@@ -107,7 +115,7 @@ namespace AnimeImageSorter
                 return;
 
             // Get FileOperation Type
-            Console.WriteLine("\n\nFile operation:\n m(ove) / c(opy) / q(uit)");
+            Console.WriteLine("\n\nFile operation, already existing files are overwritten:\n m(ove) / c(opy) / q(uit)");
             string key2 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key2 == "M")
@@ -120,7 +128,9 @@ namespace AnimeImageSorter
                 return;
 
             // Get MD5Option Type
-            Console.WriteLine("\n\nHash calculation:\nHard always uses filehashes, lower success rate and speed but no false positives.\nSoft first looks for hashes in filenames, faster and better success rate, but may have false positives:\n h(ard) / s(oft) / q(uit)");
+            Console.WriteLine("\n\nHash calculation:\nHard always uses filehashes, lower success rate and speed but no false positives." +
+                "\nSoft first looks for hashes in filenames, faster and better success rate, but may have false positives:" +
+                "\n h(ard) / s(oft) / q(uit)");
             string key3 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key3 == "H")
@@ -178,7 +188,35 @@ namespace AnimeImageSorter
                     return;
                 }
             }
+
+            log.WriteLine("Selected Options:" + key + key2 + key3 + key4 + key5);
+
+            /*
+            // Get Sort Type
+            Console.WriteLine("\n\nSauceNao, or rather its subset Pixiv API for automatic tag retrieval on images deemed NSFW, require age verification,\nplease enter your date of birth in japanese format (yyyy-mm-dd):");
+            string birthday = Console.ReadLine();
+
+            try
+            {
+                DateTime birthdayDT = DateTime.ParseExact(birthday, "yyyy-MM-dd", DateTimeFormatInfo.InvariantInfo);
+                if (birthdayDT < new DateTime(1918, 1, 1) || birthdayDT > DateTime.Now)
+                {
+                    Console.WriteLine(birthday + " is not a valid birthday for a living person (out of bounds), press any key to quit.");
+                    Console.ReadKey();
+                    return;
+                }
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(birthday + " is not a valid birthday, press any key to quit.");
+                Console.ReadKey();
+                return;
+            }
+            log.WriteLine(birthday);
+            */
             #endregion
+
+            log.Flush();
 
             // List all files in the current folder
             List<string> files = Directory.EnumerateFiles(baseDirectory, "*.*", SearchOption.TopDirectoryOnly)
@@ -300,6 +338,8 @@ namespace AnimeImageSorter
                 }
             }
 
+            log.WriteLine("\nAll Operations finished. Press any key to exit.");
+            log.Flush();
             Console.WriteLine("\nAll Operations finished. Press any key to exit.");
             Console.ReadKey();
         }
@@ -395,6 +435,7 @@ namespace AnimeImageSorter
                 {
                     case FileOperation.Copy:
                         File.Copy(file, targetFileLong, true);
+                        log.WriteLine("Copying: " + file + " to " + targetFileLong);
                         Console.WriteLine("Copying: " + file + " to " + targetFileLong);
                         break;
 
@@ -402,12 +443,17 @@ namespace AnimeImageSorter
                     case FileOperation.Move:
                         if (targetFolder == targetFolders.Last())
                         {
+                            if (File.Exists(targetFileLong))
+                                File.Delete(targetFileLong);
+
                             File.Move(file, targetFileLong);
+                            log.WriteLine("Moving: " + file + " to " + targetFileLong);
                             Console.WriteLine("Moving: " + file + " to " + targetFileLong);
                         }
                         else
                         {
                             File.Copy(file, targetFileLong, true);
+                            log.WriteLine("Moving: " + file + " to " + targetFileLong);
                             Console.WriteLine("Moving: " + file + " to " + targetFileLong);
                         }
                         break;
