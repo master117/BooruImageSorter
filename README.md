@@ -1,6 +1,7 @@
 # AnimeImageSorter
 
 This program sorts anime and similar images based on tags on booru boards and other websites into folders.
+The code is C#, and should run (recompiled) on most devices, a python port was made by the great [BotterSnike, and can be found here](https://github.com/Bottersnike/AnimeImageSorter).
 
 ## Install & Run
 
