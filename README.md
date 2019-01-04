@@ -53,7 +53,7 @@ Skip: Skips these files from sorting.
 ### Reverse Image Search
 Enables Reverse Image Search, only if booru/hash search fails: 
 
-- You need to have saucenaoapikey.txt and imgurapikey.txt in the same folder, filled with your own matching keys.
+- You need to have saucenaoapikey.txt in the same folder, filled with your own matching keys.
 
 - Very slow, every used image is uploaded.
 

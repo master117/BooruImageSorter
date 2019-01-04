@@ -48,8 +48,6 @@
     <Compile Include="BImage.cs" />
     <Compile Include="Booru.cs" />
     <Compile Include="BooruResult.cs" />
-    <Compile Include="Imgur.cs" />
-    <Compile Include="ImgurResult.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SauceNaoResult.cs" />

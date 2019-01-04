@@ -67,7 +67,6 @@ namespace AnimeImageSorter
         private static string imgurApiKey;
         private static int remainingSauces = int.MaxValue;
         private static int remainingSaucesLong = int.MaxValue;
-        private static ImgurResult lastImage;
 
         //Base directory for all further operations
         private static string baseDirectory;
@@ -115,7 +114,7 @@ namespace AnimeImageSorter
                 return;
 
             // Get FileOperation Type
-            Console.WriteLine("\n\nFile operation, already existing files are overwritten:\n m(ove) / c(opy) / q(uit)");
+            Console.WriteLine("\n\nCopy or move file to new destination operation? Already existing files are overwritten:\n m(ove) / c(opy) / q(uit)");
             string key2 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
             if (key2 == "M")
@@ -128,8 +127,8 @@ namespace AnimeImageSorter
                 return;
 
             // Get MD5Option Type
-            Console.WriteLine("\n\nHash calculation:\nHard always uses filehashes, lower success rate and speed but no false positives." +
-                "\nSoft first looks for hashes in filenames, faster and better success rate, but may have false positives:" +
+            Console.WriteLine("\n\nHash calculation:\nHard always uses file hashes, lower success rate and speed but no false positives." +
+                "\nSoft first looks for hashes in filenames then in file hashes, faster and better success rate, but may have false positives and false negatives:" +
                 "\n h(ard) / s(oft) / q(uit)");
             string key3 = Console.ReadKey().KeyChar.ToString().ToUpper();
 
@@ -176,14 +175,13 @@ namespace AnimeImageSorter
 
             if (CurrentReverseImageSearch == ReverseImageSearch.Yes)
             {
-                if (File.Exists("sauceNaoApiKey.txt") && File.Exists("imgurApiKey.txt"))
+                if (File.Exists("sauceNaoApiKey.txt"))
                 {
                     sauceNaoApiKey = File.ReadAllText("sauceNaoApiKey.txt");
-                    imgurApiKey = File.ReadAllText("imgurApiKey.txt");
                 }
                 else
                 {
-                    Console.WriteLine("\n Either sauceNaoApiKey.txt or imgurApiKey.txt missing. To fix this problem look into github. Press any key to quit.");
+                    Console.WriteLine("\n sauceNaoApiKey.txt missing. To fix this problem look into github. Press any key to quit.");
                     Console.ReadKey();
                     return;
                 }
@@ -245,75 +243,59 @@ namespace AnimeImageSorter
                     var danbooruResult = (new Booru()).GetFromMD5(md5);
 
                     //If booru search didn't find anything, try reverse search
-                    if ((danbooruResult.jArray == null || danbooruResult.jArray.Count == 0) && CurrentReverseImageSearch == ReverseImageSearch.Yes)
+                    if ((danbooruResult.jArray == null || danbooruResult.jArray.Count == 0))
                     {
                         Console.WriteLine("Couldn't find Hash on Danbooru.");
 
-                        #region rateLimits
-                        //Adhere to all ratelimits
-                        if (remainingSauces < 2)
+                        if (CurrentReverseImageSearch == ReverseImageSearch.Yes)
                         {
-                            Console.WriteLine("\nToo many Sauces, approaching SauceNao 20 requests per 30s limit. Waiting 30s.");
-                            Thread.Sleep(30000);
-                        }
-
-                        if (remainingSaucesLong < 2)
-                        {
-                            Console.WriteLine("\nToo many Sauces, approaching SauceNao 300 requests per 24hrs limit. Press any key to quit, monitor your usage at https://saucenao.com/user.php?page=search-usage and start again.");
-                            Console.ReadKey();
-                            return;
-                        }
-
-                        if (lastImage != null)
-                        {
-                            if (lastImage.userRate < 15)
+                            #region rateLimits
+                            //Adhere to all ratelimits
+                            if (remainingSauces < 2)
                             {
-                                Console.WriteLine("\nToo many Imgur uploads. Approaching user rate limit of x per hour. Waiting until user rate is reset at: " + lastImage.userReset.ToLocalTime());
-                                Thread.Sleep((int)Math.Ceiling((lastImage.userReset.ToLocalTime() - DateTime.Now).TotalMilliseconds));
+                                Console.WriteLine("\nToo many Reverse Lookups, approaching SauceNao 20 requests per 30s limit. Waiting 30s.");
+                                Thread.Sleep(30000);
                             }
 
-                            if (lastImage.clientRate < 15)
+                            if (remainingSaucesLong < 2)
                             {
-                                Console.WriteLine("\nToo many Imgur uploads. Approaching client rate limit of 1,250 per day. Press any key to quit and try again in 24hrs.");
+                                Console.WriteLine("\nToo many Reverse Lookups, approaching SauceNao 300 requests per 24hrs limit. Press any key to quit, monitor your usage at https://saucenao.com/user.php?page=search-usage and start again.");
                                 Console.ReadKey();
                                 return;
                             }
+                            #endregion
 
-                            if (lastImage.postRemaining < 15)
+                            Console.WriteLine("Reverse Image Searching...");
+
+                            //Search by file
+                            FileStream stream = new FileStream(file, FileMode.Open);
+                            SauceNaoResult response = new SauceNao(sauceNaoApiKey).Request(stream);
+
+                            //adjust limits
+                            remainingSauces = (int)response.header["short_remaining"];
+                            remainingSaucesLong = (int)response.header["long_remaining"];
+
+                            //Work results
+                            var results = response.results;                         
+
+                            //Remove all low similarity results
+                            foreach (var element in results.ToArray().Where(x => (float)x.Key["similarity"] < 90.0))
+                                results.Remove(element.Key);
+
+                            //Get danbooru id, if any high similarity result has one, then get danbooru post from it
+                            if (results.Any(x => x.Value["danbooru_id"] != null))
                             {
-                                Console.WriteLine("\nToo many Imgur uploads. Approaching post rate limit of 1,250 per hour. Waiting until user rate is reset in: " + lastImage.postReset + " seconds.");
-                                Thread.Sleep(lastImage.postReset * 1000);
+                                var result = results.First(x => x.Value["danbooru_id"] != null);
+                                Console.WriteLine("Danbooru Result found with similarity of " + result.Key["similarity"].ToString() + "%.");
+                                string danbooruId = result.Value["danbooru_id"].ToString();
+
+                                //Get JSON Data on file
+                                danbooruResult = (new Booru()).GetFromID(danbooruId);
                             }
-                        }
-                        #endregion
-
-                        Console.WriteLine("Uploading to imgur for Reverse Image Search...");
-                        ImgurResult image = Imgur.Upload(file, imgurApiKey);
-                        lastImage = image;
-                        Console.WriteLine("Uploaded: " + Math.Min(lastImage.clientRate, Math.Min(lastImage.userRate, lastImage.postRemaining)) 
-                            + " to imgur, imgur upload credits remaining.\n Reverse Image Searching...");
-
-                        SauceNaoResult response = new SauceNao(sauceNaoApiKey).Request(image.url);
-                        var results = response.results;
-                        remainingSauces = (int)response.header["short_remaining"];
-                        remainingSaucesLong = (int)response.header["long_remaining"];
-
-                        //Remove all low similarity results
-                        foreach (var element in results.ToArray().Where(x => (float)x.Key["similarity"] < 90.0))
-                            results.Remove(element.Key);
-
-                        //Get danbooru id, if any high similarity result has one, then get danbooru post from it
-                        if (results.Any(x => x.Value["danbooru_id"] != null))
-                        {
-                            Console.WriteLine("Result found.");
-                            string danbooruId = results.First(x => x.Value["danbooru_id"] != null).Value["danbooru_id"].ToString();
-
-                            //Get JSON Data on file
-                            danbooruResult = (new Booru()).GetFromID(danbooruId);
-                        }
-                        else
-                        {
-                            Console.WriteLine("No result found.");
+                            else
+                            {
+                                Console.WriteLine("No Danbooru result found with similarity >90%.");
+                            }
                         }
                     }
 
